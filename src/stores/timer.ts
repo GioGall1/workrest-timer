@@ -55,17 +55,17 @@ export const useTimerStore = defineStore('timer', {
     // Сколько прошло в текущей фазе (мс)
     elapsedInPhaseMs(): number {
       if (!this.phaseDurationMs) return 0
-      const rem = Math.max(0, this.targetTs - this.nowTs)
-      return Math.max(0, this.phaseDurationMs - rem)
+      const rem = this.isPaused
+        ? Math.max(0, this.pausedRemainingMs)
+        : Math.max(0, this.targetTs - this.nowTs)
+      const elapsed = Math.max(0, this.phaseDurationMs - rem)
+      return Math.min(this.phaseDurationMs, elapsed)
     },
   
     // Общее отработанное время: завершённые «work» + текущая «work» (если идёт)
     overallWorkedMs(): number {
-      const addCurrent =
-        this.phase === 'work' && !this.isPaused && !this.awaitingAction
-          ? this.elapsedInPhaseMs
-          : 0
-      return Math.min(this.workedMs + addCurrent, this.totalWorkMs)
+      const current = this.phase === 'work' ? this.elapsedInPhaseMs : 0
+      return Math.min(this.workedMs + current, this.totalWorkMs)
     },
   
     // Глобальный прогресс к цели totalWorkMs (0..1)
@@ -135,12 +135,26 @@ export const useTimerStore = defineStore('timer', {
     },
 
     skip() {
-      // принудительно перейти к следующей фазе
+      // Если пропускаем во время «work» — докинем уже отработанное в общий прогресс,
+      // чтобы глобальная шкала не откатывалась назад.
+      if (this.phase === 'work') {
+        this.workedMs = Math.min(
+          this.totalWorkMs,
+          this.workedMs + this.elapsedInPhaseMs
+        )
+      }
+  
+      // Сбрасываем служебные флаги и переходим к следующей фазе
       this.awaitingAction = false
       this.isPaused = false
       this.pausedRemainingMs = 0
-      if (this.phase === 'work') this._enter('rest')
-      else if (this.phase === 'rest') this._enter('work')
+  
+      if (this.phase === 'work') {
+        this._enter('rest')
+      } else if (this.phase === 'rest') {
+        this._enter('work')
+      }
+  
       this._startTick()
     },
 

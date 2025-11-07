@@ -53,9 +53,10 @@ const overallPct = computed(() => (s.overallProgress * 100).toFixed(2) + '%')
 
         <!-- ГЛОБАЛЬНЫЙ прогресс по рабочему времени -->
     <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-      <div class="h-full bg-emerald-500 transition-all"
-          :style="{ width: overallPct }">
+      <div
+          class="h-full bg-emerald-500 transition-[width] duration-500 ease-out"
+          :style="{ width: (s.overallProgress * 100).toFixed(2) + '%' }"
+        />
       </div>
     </div>
-  </div>
 </template>
