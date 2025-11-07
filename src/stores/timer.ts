@@ -29,23 +29,53 @@ export const useTimerStore = defineStore('timer', {
     tickHandle: 0 as number | 0,
   }),
   getters: {
+    // Общая цель рабочей сессии (в мс)
     totalWorkMs: (s) => s.cfg.totalHours * 60 * 60 * 1000,
-
-    // при паузе считаем остаток по зафиксированному значению
+  
+    // Остаток времени до конца ТЕКУЩЕЙ фазы
+    // При паузе используем зафиксированное значение
     remainingMs(): number {
       return this.isPaused
         ? this.pausedRemainingMs
         : Math.max(0, this.targetTs - this.nowTs)
     },
-
+  
+    // Идёт ли сейчас активная фаза (work/rest)
     isRunning: (s) => s.phase === 'work' || s.phase === 'rest',
-
+  
+    // Прогресс ТЕКУЩЕЙ фазы (0..1) — для локальной полосы
     phaseProgress(): number {
       if (!this.phaseDurationMs) return 0
       const elapsed = Math.max(0, this.phaseDurationMs - this.remainingMs)
       return Math.min(1, elapsed / this.phaseDurationMs)
     },
+  
+    // --- НИЖЕ ДОБАВЛЕНЫ НОВЫЕ ГЕТТЕРЫ ДЛЯ ГЛОБАЛЬНОГО ПРОГРЕССА ---
+  
+    // Сколько прошло в текущей фазе (мс)
+    elapsedInPhaseMs(): number {
+      if (!this.phaseDurationMs) return 0
+      const rem = Math.max(0, this.targetTs - this.nowTs)
+      return Math.max(0, this.phaseDurationMs - rem)
+    },
+  
+    // Общее отработанное время: завершённые «work» + текущая «work» (если идёт)
+    overallWorkedMs(): number {
+      const addCurrent =
+        this.phase === 'work' && !this.isPaused && !this.awaitingAction
+          ? this.elapsedInPhaseMs
+          : 0
+      return Math.min(this.workedMs + addCurrent, this.totalWorkMs)
+    },
+  
+    // Глобальный прогресс к цели totalWorkMs (0..1)
+   overallProgress(): number {
+      const total = this.totalWorkMs || 1
+      if (this.phase === 'idle' || this.phase === 'done') return 0
+      return Math.min(1, this.overallWorkedMs / total)
+    },
   },
+  
   actions: {
     configure(partial: Partial<Cfg>) {
       this.cfg = { ...this.cfg, ...partial }

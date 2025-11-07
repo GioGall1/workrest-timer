@@ -14,7 +14,7 @@ const label = computed(() =>
 const mm = computed(() => String(Math.floor(s.remainingMs / 1000 / 60)).padStart(2,'0'))
 const ss = computed(() => String(Math.floor((s.remainingMs / 1000) % 60)).padStart(2,'0'))
 const cs = computed(() => String(Math.floor((s.remainingMs % 1000) / 10)).padStart(2, '0'))
-const progressPct = computed(() => (s.phaseProgress * 100).toFixed(1) + '%')
+const overallPct = computed(() => (s.overallProgress * 100).toFixed(2) + '%')
 </script>
 
 <template>
@@ -51,9 +51,11 @@ const progressPct = computed(() => (s.phaseProgress * 100).toFixed(1) + '%')
       </div>
     </div>
 
-    <!-- прогресс текущей фазы -->
+        <!-- ГЛОБАЛЬНЫЙ прогресс по рабочему времени -->
     <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-      <div class="h-full bg-emerald-500" :style="{ width: progressPct }"></div>
+      <div class="h-full bg-emerald-500 transition-all"
+          :style="{ width: overallPct }">
+      </div>
     </div>
   </div>
 </template>
