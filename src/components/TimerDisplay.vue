@@ -21,8 +21,27 @@ const progressPct = computed(() => (s.phaseProgress * 100).toFixed(1) + '%')
   <div class="space-y-3">
     <div class="bg-slate-900 rounded-2xl p-5 flex items-center justify-between">
       <div>
-        <p class="text-xs uppercase tracking-wide text-slate-400">Фаза</p>
-        <p class="text-xl font-semibold">{{ label }}</p>
+        
+        <p class="text-xs uppercase tracking-wide text-slate-400 flex items-center gap-2">
+          Фаза
+          <span class="relative inline-flex">
+            <!-- Пульсирующая точка -->
+            <span
+              v-if="s.isRunning && !s.isPaused"
+              class="absolute inline-flex h-full w-full animate-ping rounded-full"
+              :class="s.phase === 'work' ? 'bg-emerald-400' : 'bg-sky-400'"
+            ></span>
+            <span
+              class="relative inline-flex size-3 rounded-full"
+              :class="
+                s.phase === 'work' ? 'bg-emerald-500' :
+                s.phase === 'rest' ? 'bg-sky-500' :
+                'bg-slate-500'
+              "
+            ></span>
+          </span>
+        </p>
+         <p class="text-xl font-semibold text-left">{{ label }}</p>
       </div>
       <div class="text-right">
         <p class="text-xs uppercase tracking-wide text-slate-400">Осталось</p>

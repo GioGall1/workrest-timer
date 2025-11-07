@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tabler/icons-vue": "^3.35.0",
     "pinia": "^3.0.3",
     "vue": "^3.5.22"
   },
