@@ -19,10 +19,10 @@ const showSnooze = computed(() => s.awaitingAction)
 
 // Какая сейчас роль у главной кнопки
 const mainKind = computed<'start' | 'pause' | 'continue' | 'awaiting'>(() => {
-  if (s.awaitingAction) return 'awaiting'      // ждём действие по окончании фазы
-  if (s.isPaused)       return 'continue'      // стоим на паузе
-  if (s.isRunning)      return 'pause'         // идёт work/rest
-  return 'start'                                  // ещё не запускали
+  if (s.awaitingAction) return 'awaiting'
+  if (s.isPaused)       return 'continue'
+  if (s.isRunning)      return 'pause'
+  return 'start'
 })
 
 // Главная левая кнопка: текст и поведение
@@ -43,10 +43,10 @@ const onMainClick = () => {
       break
     case 'continue':
     case 'start':
-      s.start() // стартуем/продолжаем
+      s.start()
       break
     case 'awaiting':
-      s.completePhase() // корректно переходим к следующей фазе цикла
+      s.completePhase()
       break
   }
 }
@@ -61,12 +61,9 @@ const onSkip = () => (s.awaitingAction ? s.completePhase() : s.skip())
 </script>
 
 <template>
-  <!-- общий вертикальный контейнер, который управляет расстоянием между рядами -->
   <div class="flex flex-col space-y-2">
     <!-- Ряд: Старт / Пауза -->
     <div class="flex gap-2">
-      <!-- Старт (динамически растягивается, если «Пауза» скрыта) -->
-      <!-- Главная кнопка: Старт / Пауза / Продолжить -->
     <button
       :class="[
         'w-full rounded-2xl px-6 py-3 font-semibold active:scale-95 transition inline-flex items-center justify-center gap-2 transition-all duration-300',
@@ -83,7 +80,6 @@ const onSkip = () => (s.awaitingAction ? s.completePhase() : s.skip())
     </div>
     <!-- Ряд с Отложить / Пропустить -->
     <div class="flex gap-2">
-      <!-- Отложить: появляется только на завершении фазы -->
       <transition name="fade">
         <button
           v-if="showSnooze"
@@ -94,8 +90,7 @@ const onSkip = () => (s.awaitingAction ? s.completePhase() : s.skip())
           Отложить
         </button>
       </transition>
-
-      <!-- Пропустить/Продолжить: ширина меняется плавно -->
+    
       <button
         :class="[
           showSnooze ? 'flex-1' : 'w-full',
