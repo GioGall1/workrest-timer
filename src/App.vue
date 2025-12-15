@@ -5,15 +5,22 @@ import TimerDisplay from '@/components/TimerDisplay.vue'
 import TimerControls from '@/components/TimerControls.vue'
 
 const s = useTimerStore()
-const totalHours = ref(5)
-const workMin    = ref(40)
-const restMin    = ref(20)
-const snoozeMin  = ref(5)
+const totalHours = ref(s.cfg.totalHours)
+const workMin    = ref(s.cfg.workMin)
+const restMin    = ref(s.cfg.restMin)
+const snoozeMin  = ref(s.cfg.snoozeMin)
 
-onMounted(() => s.restore())
+onMounted(() => {
+  s.restore()
+  totalHours.value = s.cfg.totalHours
+  workMin.value = s.cfg.workMin
+  restMin.value = s.cfg.restMin
+  snoozeMin.value = s.cfg.snoozeMin
+  s.ensurePermission()
+})
 watch([totalHours, workMin, restMin, snoozeMin], ([h, w, r, sn]) => {
   s.configure({ totalHours: h, workMin: w, restMin: r, snoozeMin: sn })
-}, { immediate: true })
+})
 </script>
 
 <template>

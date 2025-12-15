@@ -69,7 +69,7 @@ export const useTimerStore = defineStore('timer', {
     },
   
     // Глобальный прогресс к цели totalWorkMs (0..1)
-   overallProgress(): number {
+    overallProgress(): number {
       const total = this.totalWorkMs || 1
       if (this.phase === 'idle' || this.phase === 'done') return 0
       return Math.min(1, this.overallWorkedMs / total)
@@ -250,7 +250,11 @@ export const useTimerStore = defineStore('timer', {
 
     goNextPhase() {
       if (this.phase === 'work') {
-        this.workedMs += this.cfg.workMin * 60 * 1000
+        // Добавляем фактически отработанное время (учитывает snooze/паузу)
+        this.workedMs = Math.min(
+          this.totalWorkMs,
+          this.workedMs + this.elapsedInPhaseMs
+        )
         if (this.workedMs >= this.totalWorkMs) {
           this.phase = 'done'
           this._notify('Сессия завершена')

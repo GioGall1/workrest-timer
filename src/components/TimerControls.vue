@@ -46,7 +46,7 @@ const onMainClick = () => {
       s.start()
       break
     case 'awaiting':
-      s.completePhase()
+      s.goNextPhase()
       break
   }
 }
