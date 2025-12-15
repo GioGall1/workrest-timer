@@ -16,6 +16,7 @@ export const useTimerStore = defineStore('timer', {
     cycleIndex: 0,
     targetTs: 0,
     workedMs: 0,
+    autoNextHandle: 0 as number | 0,
 
     // показываем «Отложить / Продолжить фазу», когда фаза закончилась
     awaitingAction: false,
@@ -90,11 +91,10 @@ export const useTimerStore = defineStore('timer', {
         await Notification.requestPermission()
       }
     },
-
+ // ===== Public API (то, что дергает UI) =====
     start() {
       if (this.phase === 'done') this.reset()
 
-      // если фаза уже закончилась — ждём явного решения (Отложить/Продолжить)
       if (this.awaitingAction) return
 
       if (this.phase === 'idle') {
@@ -108,7 +108,6 @@ export const useTimerStore = defineStore('timer', {
     },
 
     pause() {
-      // нельзя ставить паузу, если фаза уже закончилась
       if (this.awaitingAction || !this.isRunning || this.isPaused) return
       const left = Math.max(0, this.targetTs - this.nowTs)
       this.isPaused = true
@@ -118,6 +117,7 @@ export const useTimerStore = defineStore('timer', {
     },
 
     reset() {
+      this._stopAutoNext()
       this.phase = 'idle'
       this.cycleIndex = 0
       this.workedMs = 0
@@ -126,7 +126,6 @@ export const useTimerStore = defineStore('timer', {
       this.isPaused = false
       this.pausedRemainingMs = 0
 
-      // полностью обнуляем визуально
       this.phaseDurationMs = 0
       this.targetTs = 0
       this.nowTs = Date.now()
@@ -135,16 +134,13 @@ export const useTimerStore = defineStore('timer', {
     },
 
     skip() {
-      // Если пропускаем во время «work» — докинем уже отработанное в общий прогресс,
-      // чтобы глобальная шкала не откатывалась назад.
       if (this.phase === 'work') {
         this.workedMs = Math.min(
           this.totalWorkMs,
           this.workedMs + this.elapsedInPhaseMs
         )
       }
-  
-      // Сбрасываем служебные флаги и переходим к следующей фазе
+
       this.awaitingAction = false
       this.isPaused = false
       this.pausedRemainingMs = 0
@@ -158,99 +154,19 @@ export const useTimerStore = defineStore('timer', {
       this._startTick()
     },
 
-    // «Продолжить фазу» после нуля (кнопка вместо автоперехода)
     completePhase() {
-      if (!this.awaitingAction) return
-      // «Продолжить фазу» — повторить текущую фазу заново на полный срок
+      this._stopAutoNext()
+      if (!this.awaitingAction) return     
       this.awaitingAction = false
       this._enter(this.phase)
       this._startTick()
     },
 
-    // «Отложить» — работает в трёх режимах: во время паузы, в ожидании, и во время активной фазы
-    snooze() {
-      const add = this.cfg.snoozeMin * 60 * 1000
-
-      if (this.isPaused) {
-        this.pausedRemainingMs += add
-        this.phaseDurationMs += add
-        this._notify(`Отложено на ${this.cfg.snoozeMin} мин.`)
-        return
-      }
-
-      if (this.awaitingAction) {
-        // фаза уже закончилась — продлеваем её и снова запускаем тик
-        this.targetTs = Date.now() + add
-        this.phaseDurationMs += add
-        this.awaitingAction = false
-        this._notify(`Отложено на ${this.cfg.snoozeMin} мин.`)
-        this._startTick()
-        return
-      }
-
-      if (this.isRunning) {
-        this.targetTs += add
-        this.phaseDurationMs += add
-        this._notify(`Отложено на ${this.cfg.snoozeMin} мин.`)
-      }
-    },
-
-    // внутреннее
-    _enter(to: Phase) {
-      const { workMin, restMin } = this.cfg
-      this.awaitingAction = false
-      this.isPaused = false
-      this.pausedRemainingMs = 0
-
-      this.phase = to
-      const durMin = to === 'work' ? workMin : restMin
-      this.phaseDurationMs = durMin * 60 * 1000
-      this.targetTs = Date.now() + this.phaseDurationMs
-
-      if (to !== 'idle' && to !== 'done')
-        this._notify(to === 'work' ? 'Работа началась' : 'Отдых начался')
-    },
-
-    _notify(body: string) {
-      try {
-        if (!('Notification' in window)) return
-        if (Notification.permission === 'granted')
-          new Notification('WorkRest Timer', { body })
-      } catch {}
-    },
-
-    _startTick() {
-      if (this.tickHandle) return
-      const loop = () => {
-        this.nowTs = Date.now()
-
-        if (this.remainingMs <= 0) {
-          // фаза закончилась — ждём решение пользователя
-          this.awaitingAction = true
-          this._notify(
-            this.phase === 'work'
-              ? 'Работа завершена — продолжить или отложить?'
-              : 'Отдых завершён — продолжить или отложить?'
-          )
-          this._stopTick()
-          return
-        }
-
-        this.tickHandle = window.setTimeout(loop, 100)
-      }
-      loop()
-    },
-
-    _stopTick() {
-      if (this.tickHandle) {
-        clearTimeout(this.tickHandle)
-        this.tickHandle = 0
-      }
-    },
-
     goNextPhase() {
+
+        this._stopAutoNext()
+
       if (this.phase === 'work') {
-        // Добавляем фактически отработанное время (учитывает snooze/паузу)
         this.workedMs = Math.min(
           this.totalWorkMs,
           this.workedMs + this.elapsedInPhaseMs
@@ -268,6 +184,105 @@ export const useTimerStore = defineStore('timer', {
       }
       this.awaitingAction = false
       this._startTick()
+    },
+  
+    snooze() {
+      const add = this.cfg.snoozeMin * 60 * 1000
+      this._stopAutoNext()
+
+      if (this.isPaused) {
+        this.pausedRemainingMs += add
+        this.phaseDurationMs += add
+        this._notify(`Отложено на ${this.cfg.snoozeMin} мин.`)
+        return
+      }
+
+      if (this.awaitingAction) {
+        this.targetTs = Date.now() + add
+        this.phaseDurationMs += add
+        this.awaitingAction = false
+        this._notify(`Отложено на ${this.cfg.snoozeMin} мин.`)
+        this._startTick()
+        return
+      }
+
+      if (this.isRunning) {
+        this.targetTs += add
+        this.phaseDurationMs += add
+        this._notify(`Отложено на ${this.cfg.snoozeMin} мин.`)
+      }
+    },
+
+  // ===== Auto logic =====
+
+    _startAutoNext() {
+      this._stopAutoNext()
+      this.autoNextHandle = window.setTimeout(()=> {
+        if (this.awaitingAction) {
+          this.goNextPhase()
+        }
+      }, 20_000)
+    },
+
+    _stopAutoNext() {
+      if (this.autoNextHandle) {
+        clearTimeout(this.autoNextHandle)
+        this.autoNextHandle = 0
+      }
+    },
+
+ // ===== Phase lifecycle ===== 
+
+    _enter(to: Phase) {
+      const { workMin, restMin } = this.cfg
+      this.awaitingAction = false
+      this.isPaused = false
+      this.pausedRemainingMs = 0
+
+      this.phase = to
+      const durMin = to === 'work' ? workMin : restMin
+      this.phaseDurationMs = durMin * 60 * 1000
+      this.targetTs = Date.now() + this.phaseDurationMs
+
+      if (to !== 'idle' && to !== 'done')
+        this._notify(to === 'work' ? 'Работа началась' : 'Отдых начался')
+    },
+
+    _startTick() {
+      if (this.tickHandle) return
+      const loop = () => {
+        this.nowTs = Date.now()
+
+        if (this.remainingMs <= 0) {
+          this.awaitingAction = true
+          this._notify(
+            this.phase === 'work'
+              ? 'Работа завершена — продолжить или отложить?'
+              : 'Отдых завершён — продолжить или отложить?'
+          )
+          this._stopTick()
+          this._startAutoNext()
+          return
+        }
+
+        this.tickHandle = window.setTimeout(loop, 100)
+      }
+      loop()
+    },
+
+    _stopTick() {
+      if (this.tickHandle) {
+        clearTimeout(this.tickHandle)
+        this.tickHandle = 0
+      }
+    },
+
+    _notify(body: string) {
+      try {
+        if (!('Notification' in window)) return
+        if (Notification.permission === 'granted')
+          new Notification('WorkRest Timer', { body })
+      } catch {}
     },
   },
 })
