@@ -17,6 +17,8 @@ export const useTimerStore = defineStore('timer', {
     targetTs: 0,
     workedMs: 0,
     autoNextHandle: 0 as number | 0,
+    autoNextAt: 0,
+    autoNextTickHandle: 0 as number | 0,
 
     // показываем «Отложить / Продолжить фазу», когда фаза закончилась
     awaitingAction: false,
@@ -51,9 +53,8 @@ export const useTimerStore = defineStore('timer', {
       return Math.min(1, elapsed / this.phaseDurationMs)
     },
   
-    // --- НИЖЕ ДОБАВЛЕНЫ НОВЫЕ ГЕТТЕРЫ ДЛЯ ГЛОБАЛЬНОГО ПРОГРЕССА ---
+    // --- ГЕТТЕРЫ ДЛЯ ГЛОБАЛЬНОГО ПРОГРЕССА ---
   
-    // Сколько прошло в текущей фазе (мс)
     elapsedInPhaseMs(): number {
       if (!this.phaseDurationMs) return 0
       const rem = this.isPaused
@@ -63,17 +64,20 @@ export const useTimerStore = defineStore('timer', {
       return Math.min(this.phaseDurationMs, elapsed)
     },
   
-    // Общее отработанное время: завершённые «work» + текущая «work» (если идёт)
     overallWorkedMs(): number {
       const current = this.phase === 'work' ? this.elapsedInPhaseMs : 0
       return Math.min(this.workedMs + current, this.totalWorkMs)
     },
   
-    // Глобальный прогресс к цели totalWorkMs (0..1)
     overallProgress(): number {
       const total = this.totalWorkMs || 1
       if (this.phase === 'idle' || this.phase === 'done') return 0
       return Math.min(1, this.overallWorkedMs / total)
+    },
+
+    autoNextSeconds(): number {
+      if (!this.awaitingAction || !this.autoNextAt) return 0
+      return Math.max(0, Math.ceil((this.autoNextAt - this.nowTs) / 1000))
     },
   },
   
@@ -215,13 +219,25 @@ export const useTimerStore = defineStore('timer', {
 
   // ===== Auto logic =====
 
-    _startAutoNext() {
+      _startAutoNext() {
       this._stopAutoNext()
-      this.autoNextHandle = window.setTimeout(()=> {
+
+      const delay = 20_000
+      this.autoNextAt = Date.now() + delay
+
+      // тик для обновления nowTs, чтобы UI видел обратный отсчёт
+      const tick = () => {
+        this.nowTs = Date.now()
+        if (!this.awaitingAction) return
+        this.autoNextTickHandle = window.setTimeout(tick, 250)
+      }
+      tick()
+
+      this.autoNextHandle = window.setTimeout(() => {
         if (this.awaitingAction) {
           this.goNextPhase()
         }
-      }, 20_000)
+      }, delay)
     },
 
     _stopAutoNext() {
@@ -229,6 +245,11 @@ export const useTimerStore = defineStore('timer', {
         clearTimeout(this.autoNextHandle)
         this.autoNextHandle = 0
       }
+      if (this.autoNextTickHandle) {
+        clearTimeout(this.autoNextTickHandle)
+        this.autoNextTickHandle = 0
+      }
+      this.autoNextAt = 0
     },
 
  // ===== Phase lifecycle ===== 

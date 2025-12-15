@@ -28,7 +28,6 @@ watch([totalHours, workMin, restMin, snoozeMin], ([h, w, r, sn]) => {
     <div class="w-full max-w-md space-y-6">
       <header class="text-center space-y-2">
         <h1 class="text-2xl font-bold">WorkRest Timer</h1>
-        <p class="text-sm text-slate-400">Работа/Отдых с оповещениями и «Отложить»</p>
       </header>
 
       <section class="grid grid-cols-2 gap-3">
