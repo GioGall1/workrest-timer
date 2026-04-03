@@ -9,9 +9,49 @@ interface Cfg {
   snoozeMin: number
 }
 
+const CFG_STORAGE_KEY = 'workrest_cfg'
+const DEFAULT_CFG: Cfg = { totalHours: 5, workMin: 40, restMin: 20, snoozeMin: 5 }
+
+function clampFiniteNumber(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number
+): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return fallback
+  return Math.min(max, Math.max(min, n))
+}
+
+function normalizeCfg(input: unknown): Cfg {
+  const o = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>
+  return {
+    // allow fractional hours but keep reasonable bounds
+    totalHours: clampFiniteNumber(o.totalHours, 1, 24, DEFAULT_CFG.totalHours),
+    // minute values should be integers
+    workMin: Math.round(clampFiniteNumber(o.workMin, 1, 240, DEFAULT_CFG.workMin)),
+    restMin: Math.round(clampFiniteNumber(o.restMin, 1, 240, DEFAULT_CFG.restMin)),
+    snoozeMin: Math.round(clampFiniteNumber(o.snoozeMin, 1, 120, DEFAULT_CFG.snoozeMin)),
+  }
+}
+
+function safeStorageGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function safeStorageSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch {}
+}
+
 export const useTimerStore = defineStore('timer', {
   state: () => ({
-    cfg: { totalHours: 5, workMin: 40, restMin: 20, snoozeMin: 5 } as Cfg,
+    cfg: { ...DEFAULT_CFG } as Cfg,
     phase: 'idle' as Phase,
     cycleIndex: 0,
     targetTs: 0,
@@ -71,7 +111,8 @@ export const useTimerStore = defineStore('timer', {
   
     overallProgress(): number {
       const total = this.totalWorkMs || 1
-      if (this.phase === 'idle' || this.phase === 'done') return 0
+      if (this.phase === 'idle') return 0
+      if (this.phase === 'done') return 1
       return Math.min(1, this.overallWorkedMs / total)
     },
 
@@ -83,12 +124,17 @@ export const useTimerStore = defineStore('timer', {
   
   actions: {
     configure(partial: Partial<Cfg>) {
-      this.cfg = { ...this.cfg, ...partial }
-      localStorage.setItem('workrest_cfg', JSON.stringify(this.cfg))
+      this.cfg = normalizeCfg({ ...this.cfg, ...partial })
+      safeStorageSet(CFG_STORAGE_KEY, JSON.stringify(this.cfg))
     },
     restore() {
-      const raw = localStorage.getItem('workrest_cfg')
-      if (raw) this.cfg = JSON.parse(raw)
+      const raw = safeStorageGet(CFG_STORAGE_KEY)
+      if (!raw) return
+      try {
+        this.cfg = normalizeCfg(JSON.parse(raw))
+      } catch {
+        this.cfg = { ...DEFAULT_CFG }
+      }
     },
     async ensurePermission() {
       if ('Notification' in window && Notification.permission === 'default') {
@@ -97,6 +143,7 @@ export const useTimerStore = defineStore('timer', {
     },
  // ===== Public API (то, что дергает UI) =====
     start() {
+      void this.ensurePermission()
       if (this.phase === 'done') this.reset()
 
       if (this.awaitingAction) return

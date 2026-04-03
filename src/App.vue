@@ -16,7 +16,6 @@ onMounted(() => {
   workMin.value = s.cfg.workMin
   restMin.value = s.cfg.restMin
   snoozeMin.value = s.cfg.snoozeMin
-  s.ensurePermission()
 })
 watch([totalHours, workMin, restMin, snoozeMin], ([h, w, r, sn]) => {
   s.configure({ totalHours: h, workMin: w, restMin: r, snoozeMin: sn })
@@ -33,19 +32,19 @@ watch([totalHours, workMin, restMin, snoozeMin], ([h, w, r, sn]) => {
       <section class="grid grid-cols-2 gap-3">
         <label class="block">
           <span class="text-xs text-slate-400">Общее время (часы)</span>
-          <input type="number" v-model.number="totalHours" min="1" class="w-full mt-1 rounded-xl bg-slate-800 px-3 py-2" />
+          <input type="number" v-model.number="totalHours" min="1" max="24" step="0.5" class="w-full mt-1 rounded-xl bg-slate-800 px-3 py-2" />
         </label>
         <label class="block">
           <span class="text-xs text-slate-400">Работа (мин)</span>
-          <input type="number" v-model.number="workMin" min="1" class="w-full mt-1 rounded-xl bg-slate-800 px-3 py-2" />
+          <input type="number" v-model.number="workMin" min="1" max="240" step="1" class="w-full mt-1 rounded-xl bg-slate-800 px-3 py-2" />
         </label>
         <label class="block">
           <span class="text-xs text-slate-400">Отдых (мин)</span>
-          <input type="number" v-model.number="restMin" min="1" class="w-full mt-1 rounded-xl bg-slate-800 px-3 py-2" />
+          <input type="number" v-model.number="restMin" min="1" max="240" step="1" class="w-full mt-1 rounded-xl bg-slate-800 px-3 py-2" />
         </label>
         <label class="block">
           <span class="text-xs text-slate-400">Отложить (мин)</span>
-          <input type="number" v-model.number="snoozeMin" min="1" class="w-full mt-1 rounded-xl bg-slate-800 px-3 py-2" />
+          <input type="number" v-model.number="snoozeMin" min="1" max="120" step="1" class="w-full mt-1 rounded-xl bg-slate-800 px-3 py-2" />
         </label>
       </section>
 
